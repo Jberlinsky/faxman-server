@@ -1,25 +1,27 @@
 package service
 
 import (
-	"github.com/sfreiberg/gotwilio"
-	"github.com/jberlinsky/faxman-server/api"
+	"fmt"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gin-gonic/gin"
-	"log"
+	"github.com/jberlinsky/faxman-server/api"
+	"github.com/sfreiberg/gotwilio"
+	"io"
 )
 
 type FaxResource struct {
 	*gotwilio.FaxResource
-	TwilioAccountSID string
+	TwilioAccountSID   string
 	TwilioAccountToken string
-	S3Bucket string
-	S3Region string
+	S3Bucket           string
+	S3Region           string
 }
 
 func (r *FaxResource) CreateFax(c *gin.Context) {
-	faxMediaLocations := make([]string)
+	var faxMediaLocations []string
 	multipart, err := c.Request.MultipartReader()
 	if err != nil {
-		c.JSON(400, api.NewError("Failed to create MultipartReader", err)
+		c.JSON(400, api.NewError("Failed to create MultipartReader"))
 	}
 
 	for {
@@ -28,12 +30,12 @@ func (r *FaxResource) CreateFax(c *gin.Context) {
 			break
 		}
 		if err != nil {
-			c.JSON(400, api.NewError("Error reading multipart section: %v", err))
+			c.JSON(400, api.NewError(fmt.Sprintf("Error reading multipart section: %v", err)))
 			break
 		}
 		disposition, params, err := mime.ParseMediaType(mimePart.Header.Get("Content-Disposition"))
 		if err != nil {
-			c.JSON(400, api.NewError("Invalid Content Disposition: %v", err))
+			c.JSON(400, api.NewError(fmt.Sprintf("Invalid Content Disposition: %v", err)))
 			break
 		}
 
@@ -46,11 +48,11 @@ func (r *FaxResource) CreateFax(c *gin.Context) {
 		)
 		result, err := uploader.Upload(
 			&s3manager.UploadInput{
-				Body: mimePart,
-				Bucket: aws.String(r.S3Bucket),
-				Key: aws.String(params["filename"]),
+				Body:        mimePart,
+				Bucket:      aws.String(r.S3Bucket),
+				Key:         aws.String(params["filename"]),
 				ContentType: aws.String(mimePart.Header.Get("Content-Type")),
-				ACL: aws.String("public-read"),
+				ACL:         aws.String("public-read"),
 			},
 		)
 		if err != nil {
@@ -74,7 +76,7 @@ func (r *FaxResource) CreateFax(c *gin.Context) {
 
 	fax.MediaUrl = faxMediaLocations[0]
 
-	fax, exception, err := twilio.SendFax(
+	fax, exception, err := r.twilioClient().SendFax(
 		fax.To,
 		fax.From,
 		fax.MediaUrl,
@@ -97,7 +99,7 @@ func (r *FaxResource) CreateFax(c *gin.Context) {
 func (r *FaxResource) GetAllFaxes(c *gin.Context) {
 	var faxes []*gotwilio.FaxResource
 
-	faxes, exception, err := twilio.GetFaxes("", "", "", "")
+	faxes, exception, err := r.twilioClient().GetFaxes("", "", "", "")
 	if err != nil {
 		c.JSON(500, api.NewError(fmt.Sprintf("Something went wrong retrieving faxes: %v", err.Error())))
 		return
@@ -110,13 +112,9 @@ func (r *FaxResource) GetAllFaxes(c *gin.Context) {
 }
 
 func (r *FaxResource) GetFax(c *gin.Context) {
-	id, err := r.getId(c)
-	if err != nil {
-		c.JSON(404, gin.H{"error": "not found"})
-		return
-	}
+	id := r.getId(c)
 
-	faxResource, exception, err := twilio.GetFax(id)
+	faxResource, exception, err := r.twilioClient().GetFax(id)
 	if err != nil {
 		c.JSON(500, api.NewError(fmt.Sprintf("Something went wrong retrieving fax: %v", err.Error())))
 		return
@@ -129,7 +127,7 @@ func (r *FaxResource) GetFax(c *gin.Context) {
 }
 
 func (r *FaxResource) getId(c *gin.Context) string {
-	id = c.Params.ByName("id")
+	id := c.Params.ByName("id")
 	return id
 }
 

@@ -1,11 +1,11 @@
-ORGANIZATION=jberlinsky
+ORGANIZATION=Jberlinsky
 PROJECT_NAME=faxman-server
 GOVERSION=$(shell go version)
 GOOS=$(word 1,$(subst /, ,$(lastword $(GOVERSION))))
 GOARCH=$(word 2,$(subst /, ,$(lastword $(GOVERSION))))
 RELEASE_DIR=bin
 DEVTOOL_DIR=devtools
-PACKAGE=github.com/$ORGANIZATION/$PROJECT_NAME
+PACKAGE=github.com/${ORGANIZATION}/${PROJECT_NAME}
 REVISION=$(shell git rev-parse --verify HEAD)
 SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./_vendor-*/")
 
@@ -13,7 +13,7 @@ SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./
 
 all: installdeps clean fmt simplify check build-linux-amd64 build-linux-386 build-darwin-amd64
 
-build: $(RELEASE_DIR)/$(PROJECT_NAME)_$(GOOS)_$(GOARCH) $(RELEASE_DIR)/$(PROJECT_NAME)_worker_$(GOOS)_$(GOARCH)
+build: $(RELEASE_DIR)/$(PROJECT_NAME)_$(GOOS)_$(GOARCH)
 
 build-linux-amd64:
 	$(MAKE) build GOOS=linux GOARCH=amd64
@@ -29,20 +29,12 @@ ifndef VERSION
 	@echo '[ERROR] $$VERSION must be specified'
 	exit 255
 endif
+	cd cmd/server; \
 	go build -ldflags "-X $(PACKAGE).rev=$(REVISION) -X $(PACKAGE).ver=$(VERSION)" \
-		-o $(RELEASE_DIR)/$(PROJECT_NAME)_$(GOOS)_$(GOARCH)_$(VERSION) main.go
-
-$(RELEASE_DIR)/$(PROJECT_NAME)_worker_$(GOOS)_$(GOARCH):
-ifndef VERSION
-	@echo '[ERROR] $$VERSION must be specified'
-	exit 255
-endif
-	go build -ldflags "-X $(PACKAGE).rev=$(REVISION) -X $(PACKAGE).ver=$(VERSION)" \
-		-o $(RELEASE_DIR)/$(PROJECT_NAME)_worker_$(GOOS)_$(GOARCH)_$(VERSION) worker.go
+		-o $(RELEASE_DIR)/$(PROJECT_NAME)_$(GOOS)_$(GOARCH)_$(VERSION)
 
 installdeps:
-	go get -u github.com/golang/dep/cmd/dep
-	@PATH=$(DEVTOOL_DIR)/$(GOOS)/$(GOARCH):$(PATH) dep ensure
+	@PATH=$(DEVTOOL_DIR)/$(GOOS)/$(GOARCH):$(PATH) glide install
 
 fmt:
 	@gofmt -l -w $(SRC)
